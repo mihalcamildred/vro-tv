@@ -2,22 +2,87 @@
 <html><head><meta charset="utf-8"><title>V Ro TV</title>
 <style>
  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#12304a;color:#fff;font-family:Arial,sans-serif}
- .ecran{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center}
+ #yt,#yt iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+ .ecran{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;background:#12304a}
  h1{margin:0;font-size:120px;letter-spacing:.04em}
  p{margin:0;font-size:46px;color:#cfe3f5}
- .ceas{position:absolute;right:40px;top:28px;font-size:48px;font-weight:700}
- .banda{position:absolute;left:0;right:0;bottom:0;padding:16px 30px;background:rgba(0,0,0,.45);font-size:38px;color:#ffd84a;white-space:nowrap;overflow:hidden}
+ .sigla{position:absolute;left:28px;top:22px;font-size:34px;font-weight:700;color:rgba(255,255,255,.85);text-shadow:0 2px 6px rgba(0,0,0,.6)}
+ .ceas{position:absolute;right:32px;top:22px;font-size:40px;font-weight:700;text-shadow:0 2px 6px rgba(0,0,0,.6)}
+ .banda{position:absolute;left:0;right:0;bottom:0;padding:12px 30px;background:rgba(0,0,0,.5);font-size:32px;color:#ffd84a;white-space:nowrap;overflow:hidden}
 </style></head>
 <body>
-<!-- V Ro (17.11.2026): canalul implicit al televizorului din garsoniera. Textele se schimba aici. -->
-<div class="ecran"><h1>V Ro TV</h1><p id="sub">Emisia începe în curând</p></div>
+<!-- V Ro TV (17.11.2026 21:35): canalul televizorului din garsoniera G1.
+     PLAYLIST = playlistul de YouTube (nelistat sau public). MESAJE = banda galbena. Ce schimbi aici apare singur in joc. -->
+<div id="yt"></div>
+<div class="ecran" id="ecran"><h1>V Ro TV</h1><p id="sub">Emisia începe în curând</p></div>
+<div class="sigla">V Ro TV</div>
 <div class="ceas" id="ceas">--:--</div>
 <div class="banda" id="banda"></div>
 <script>
+ const PLAYLIST = 'PLVNYcphSCazQ';
  const MESAJE = ['Bine ai venit acasă!', 'Vremea în Viroșeni: se anunță cer variabil.', 'Program: știri, muzică și reclame de odinioară.'];
+ const BANDA_PESTE_CLIP = true;   // false = banda galbena doar pe ecranul albastru
+
+ const q = new URLSearchParams(location.search);
+ let start = { index: parseInt(q.get('index') || '0', 10) || 0, sec: parseInt(q.get('sec') || '0', 10) || 0 };
+ let volum = parseInt(q.get('vol') || '0', 10) || 0;   // jocul trimite volumul (scade cu distanta)
+ let jucator = null, gata = false, erori = 0;
+ const ecran = document.getElementById('ecran'), sub = document.getElementById('sub'), banda = document.getElementById('banda');
+
  let i = 0;
  function ceas(){ const d=new Date(); document.getElementById('ceas').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
- function banda(){ document.getElementById('banda').textContent=MESAJE[i%MESAJE.length]; i++; }
- ceas(); banda(); setInterval(ceas,10000); setInterval(banda,6000);
+ function rotesteBanda(){ banda.textContent=MESAJE[i%MESAJE.length]; i++; }
+ ceas(); rotesteBanda(); setInterval(ceas,10000); setInterval(rotesteBanda,8000);
+
+ function albastru(text){ sub.textContent = text; ecran.style.display = 'flex'; banda.style.display = 'block'; }
+ function peClip(){ ecran.style.display = 'none'; banda.style.display = BANDA_PESTE_CLIP ? 'block' : 'none'; }
+ function aplicaVolum(){ if (!gata) return; try { if (volum > 0) { jucator.unMute(); jucator.setVolume(volum); } else jucator.mute(); } catch (x) {} }
+
+ window.onYouTubeIframeAPIReady = function () {
+   jucator = new YT.Player('yt', {
+     width: '100%', height: '100%', host: 'https://www.youtube-nocookie.com',
+     playerVars: { listType: 'playlist', list: PLAYLIST, index: start.index, start: start.sec, autoplay: 1, mute: 1, controls: 0,
+                   disablekb: 1, rel: 0, iv_load_policy: 3, playsinline: 1, fs: 0, loop: 1 },
+     events: {
+       onReady: function (e) {
+         gata = true; e.target.mute(); e.target.setLoop(true);
+         e.target.loadPlaylist({ list: PLAYLIST, listType: 'playlist', index: start.index, startSeconds: start.sec });
+         aplicaVolum();
+         setTimeout(function () { try { if (jucator.getPlayerState() !== 1) jucator.playVideo(); } catch (x) {} }, 3000);
+       },
+       onStateChange: function (e) {
+         if (e.data === 1) { erori = 0; peClip(); aplicaVolum(); }
+         if (e.data === 0) {   // la ultimul clip o ia de la capat
+           try { const l = jucator.getPlaylist() || [], k = jucator.getPlaylistIndex();
+                 if (l.length && k >= l.length - 1) jucator.playVideoAt(0); else jucator.nextVideo(); } catch (x) { jucator.playVideoAt(0); }
+         }
+       },
+       onError: function () {   // clip blocat (ex. 150 = autorul nu permite) sau sters: trecem la urmatorul
+         erori++;
+         let n = 0; try { n = (jucator.getPlaylist() || []).length; } catch (x) {}
+         if (n && erori >= n) { albastru('Fără semnal'); return; }
+         albastru('Urmează...');
+         setTimeout(function () { try { jucator.nextVideo(); } catch (x) {} }, 1500);
+       }
+     }
+   });
+ };
+
+ // comenzi din joc (SendDuiMessage): volum, clipul urmator / anterior, pornire la un anumit clip
+ window.addEventListener('message', function (ev) {
+   let d = ev.data; if (typeof d === 'string') { try { d = JSON.parse(d); } catch (x) { return; } }
+   if (!d || !d.t) return;
+   if (d.t === 'vol') { volum = Math.max(0, Math.min(100, d.v | 0)); aplicaVolum(); return; }
+   if (!gata) { if (d.t === 'start') start = { index: d.index | 0, sec: d.sec | 0 }; return; }
+   if (d.t === 'urmator') jucator.nextVideo();
+   if (d.t === 'anterior') jucator.previousVideo();
+   if (d.t === 'start') jucator.loadPlaylist({ list: PLAYLIST, listType: 'playlist', index: d.index | 0, startSeconds: d.sec | 0 });
+ });
+
+ const s = document.createElement('script');
+ s.src = 'https://www.youtube.com/iframe_api';
+ s.onerror = function () { albastru('Fără semnal'); };
+ document.head.appendChild(s);
+ setTimeout(function () { if (!gata) albastru('Se caută semnalul...'); }, 6000);
 </script>
 </body></html>
