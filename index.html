@@ -1,0 +1,23 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>V Ro TV</title>
+<style>
+ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#12304a;color:#fff;font-family:Arial,sans-serif}
+ .ecran{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center}
+ h1{margin:0;font-size:120px;letter-spacing:.04em}
+ p{margin:0;font-size:46px;color:#cfe3f5}
+ .ceas{position:absolute;right:40px;top:28px;font-size:48px;font-weight:700}
+ .banda{position:absolute;left:0;right:0;bottom:0;padding:16px 30px;background:rgba(0,0,0,.45);font-size:38px;color:#ffd84a;white-space:nowrap;overflow:hidden}
+</style></head>
+<body>
+<!-- V Ro (17.11.2026): canalul implicit al televizorului din garsoniera. Textele se schimba aici. -->
+<div class="ecran"><h1>V Ro TV</h1><p id="sub">Emisia începe în curând</p></div>
+<div class="ceas" id="ceas">--:--</div>
+<div class="banda" id="banda"></div>
+<script>
+ const MESAJE = ['Bine ai venit acasă!', 'Vremea în Viroșeni: se anunță cer variabil.', 'Program: știri, muzică și reclame de odinioară.'];
+ let i = 0;
+ function ceas(){ const d=new Date(); document.getElementById('ceas').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
+ function banda(){ document.getElementById('banda').textContent=MESAJE[i%MESAJE.length]; i++; }
+ ceas(); banda(); setInterval(ceas,10000); setInterval(banda,6000);
+</script>
+</body></html>
